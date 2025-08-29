@@ -43,6 +43,11 @@ def infer_model(frames, model):
     dists = [-1]*2
     ball_track = [(None,None)]*2
     for num in tqdm(range(2, len(frames))):
+        # original frame size
+        orig_h, orig_w = frames[num].shape[:2]
+        scale_x = float(orig_w) / float(width)
+        scale_y = float(orig_h) / float(height)
+
         img = cv2.resize(frames[num], (width, height))
         img_prev = cv2.resize(frames[num-1], (width, height))
         img_preprev = cv2.resize(frames[num-2], (width, height))
@@ -53,14 +58,14 @@ def infer_model(frames, model):
 
         out = model(torch.from_numpy(inp).float().to(device))
         output = out.argmax(dim=1).detach().cpu().numpy()
-        x_pred, y_pred = postprocess(output)
+        x_pred, y_pred = postprocess(output, scale_x=scale_x, scale_y=scale_y)
         ball_track.append((x_pred, y_pred))
 
         if ball_track[-1][0] and ball_track[-2][0]:
             dist = distance.euclidean(ball_track[-1], ball_track[-2])
         else:
             dist = -1
-        dists.append(dist)  
+        dists.append(dist)
     return ball_track, dists 
 
 def remove_outliers(ball_track, dists, max_dist = 100):

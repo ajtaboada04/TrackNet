@@ -134,3 +134,6 @@ exps/gpu_20gb/model_last.pt
 # Logs
 training.log
 *.log
+
+test_soccernet.mp4
+output_test.mp4

@@ -87,18 +87,44 @@ def validate(model, val_loader, device, epoch, min_dist=5):
     return np.mean(losses), precision, recall, f1
 
 
-def postprocess(feature_map, scale=2):
+def postprocess(feature_map, scale_x: float = 2.0, scale_y: float = 2.0):
+    """Convert model output to a coordinate prediction.
+
+    The model produces a flattened heatmap for input size 360x640. This
+    function finds a circle and scales the coordinate back to the original
+    frame size using provided per-axis scales.
+
+    scale_x and scale_y default to 2.0 for legacy 1280x720 → 640x360 mapping.
+    """
     feature_map *= 255
     feature_map = feature_map.reshape((360, 640))
     feature_map = feature_map.astype(np.uint8)
     ret, heatmap = cv2.threshold(feature_map, 127, 255, cv2.THRESH_BINARY)
-    circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=2,
-                               maxRadius=7)
-    x,y = None, None
+    circles = cv2.HoughCircles(
+        heatmap,
+        cv2.HOUGH_GRADIENT,
+        dp=1,
+        minDist=1,
+        param1=50,
+        param2=2,
+        minRadius=2,
+        maxRadius=7,
+    )
+    x, y = None, None
     if circles is not None:
         if len(circles) == 1:
-            x = circles[0][0][0]*scale
-            y = circles[0][0][1]*scale
+            x = circles[0][0][0] * scale_x
+            y = circles[0][0][1] * scale_y
+        else:
+            # fall back to the global maximum when multiple circles found
+            _, _, _, max_loc = cv2.minMaxLoc(feature_map)
+            x = max_loc[0] * scale_x
+            y = max_loc[1] * scale_y
+    else:
+        # fallback to global peak
+        _, _, _, max_loc = cv2.minMaxLoc(feature_map)
+        x = max_loc[0] * scale_x
+        y = max_loc[1] * scale_y
     return x, y
 
 
